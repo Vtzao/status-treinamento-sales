@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Treinamentos v6 (Status Agendado)</title>
+    <!-- Importa a biblioteca para criar os gráficos -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PLUGIN ADICIONAL para mostrar os números dentro do gráfico -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0"></script>
+    <!-- Estilos para deixar o painel bonito e moderno -->
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f7fa;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            width: 100%;
+            max-width: 1300px;
+            margin: auto;
+            background: #ffffff;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            display: flex;
+            flex-direction: column;
+        }
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 25px;
+        }
+        .filters-container {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 35px;
+            flex-wrap: wrap;
+        }
+        .filter-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .filter-group > label {
+            font-size: 1.1em;
+            font-weight: 500;
+            color: #34495e;
+        }
+        select {
+            padding: 12px 15px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 1em;
+            background-color: #fff;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        select:hover {
+            border-color: #3498db;
+        }
+        .radio-group input { display: none; }
+        .radio-group label {
+            padding: 8px 16px;
+            border: 1px solid #ccc;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: normal;
+            transition: all 0.3s;
+        }
+        .radio-group input:checked + label {
+            background-color: #2c3e50;
+            color: #fff;
+            border-color: #2c3e50;
+        }
+        .main-content {
+            display: flex;
+            gap: 40px;
+            align-items: flex-start;
+        }
+        .chart-section {
+            flex: 1.3;
+            min-width: 450px;
+        }
+        .table-section {
+            flex: 1.2;
+            display: flex;
+            flex-direction: column;
+        }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 550px;
+            height: 440px;
+            margin: 0 auto;
+            cursor: pointer;
+        }
+        .table-wrapper {
+            max-height: 65vh;
+            overflow-y: auto;
+            border: 1px solid #dfe6e9;
+            border-radius: 8px;
+        }
+        #table-filter-status, .loading-status {
+            text-align: center;
+            color: #555;
+            font-weight: 500;
+            min-height: 24px;
+            margin-top: 0;
+        }
+        #details-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        #details-table th, #details-table td {
+            border: none;
+            border-bottom: 1px solid #dfe6e9;
+            padding: 14px;
+            text-align: left;
+        }
+        #details-table th {
+            background-color: #f1f5f8;
+            font-weight: 600;
+            color: #34495e;
+            position: sticky;
+            top: 0;
+        }
+        #details-table tr:last-child td { border-bottom: none; }
+        #details-table tr:nth-child(even) { background-color: #f8f9fa; }
+        #details-table td:nth-child(3), #details-table td:nth-child(4) {
+            text-align: center;
+            font-size: 1.2em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>📊 Painel Interativo de Treinamentos</h1>
+    
+    <div class="filters-container">
+        <div class="filter-group">
+            <label>Cargo:</label>
+            <select id="cargo-filter" disabled>
+                <option>Carregando...</option>
+            </select>
+        </div>
+        <div class="filter-group radio-group">
+            <label>Módulo:</label>
+            <input type="radio" id="mod-geral" name="modulo" value="Geral" checked>
+            <label for="mod-geral">Geral</label>
+            <input type="radio" id="mod-tarefas" name="modulo" value="Tarefas">
+            <label for="mod-tarefas">Tarefas</label>
+            <input type="radio" id="mod-calendario" name="modulo" value="Calendario">
+            <label for="mod-calendario">Calendário</label>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="chart-section">
+            <div class="chart-container">
+                <canvas id="trainingChart"></canvas>
+            </div>
+        </div>
+        <div class="table-section">
+            <h2 id="table-filter-status" class="loading-status">Carregando dados da planilha...</h2>
+            <div class="table-wrapper">
+                <table id="details-table">
+                    <thead>
+                        <tr>
+                            <th>Nome</th>
+                            <th>Cargo</th>
+                            <th>Tarefas</th>
+                            <th>Calendário</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- As linhas da tabela serão inseridas aqui via JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- LINK DA SUA PLANILHA ---
+    const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1w6hqW8Vgpake8BX5b7ryI8QbMCBgao-BJcMEU4mfUNs/export?format=csv';
+
+    // --- VARIÁVEIS GLOBAIS ---
+    let colaboradores = [];
+    let tableClickFilter = null; // Pode ser 'treinado', 'nao_treinado', 'agendado'
+
+    // Registra o plugin de datalabels
+    Chart.register(ChartDataLabels);
+
+    const ctx = document.getElementById('trainingChart').getContext('2d');
+    const trainingChart = new Chart(ctx, {
+        type: 'pie',
+        data: {
+            labels: ['Treinados', 'Não Treinados', 'Agendados'],
+            datasets: [{
+                label: 'Status de Treinamento',
+                data: [0, 0, 0],
+                backgroundColor: ['rgb(0, 110, 106)', 'rgb(192, 0, 0)', 'rgb(255, 192, 0)'], // Verde, Vermelho, Amarelo (da imagem)
+                borderColor: '#ffffff',
+                borderWidth: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            onClick: (event, elements) => {
+                if (elements.length > 0) {
+                    const clickedIndex = elements[0].index;
+                    let newFilter = null;
+                    if (clickedIndex === 0) newFilter = 'treinado';
+                    if (clickedIndex === 1) newFilter = 'nao_treinado';
+                    if (clickedIndex === 2) newFilter = 'agendado';
+                    
+                    tableClickFilter = (tableClickFilter === newFilter) ? null : newFilter;
+                    updateDashboard();
+                }
+            },
+            plugins: {
+                legend: { position: 'bottom', labels: { font: { size: 14 } } },
+                title: { display: true, text: 'Distribuição de Treinamentos', font: { size: 18, weight: 'bold' }, padding: { top: 10, bottom: 20 } },
+                datalabels: {
+                    formatter: (value) => (value > 0 ? value : ''),
+                    font: { weight: 'bold', size: 16 },
+                    color: (context) => {
+                        // Para Amarelo (Agendados), usa texto preto
+                        if (context.dataIndex === 2) return '#333';
+                        // Para Verde (Treinados) e Vermelho (Não Treinados), usa texto branco
+                        return '#fff';
+                    },
+                }
+            }
+        }
+    });
+
+    const cargoFilter = document.getElementById('cargo-filter');
+    const moduloRadios = document.querySelectorAll('input[name="modulo"]');
+    const tableBody = document.getElementById('table-body');
+    const tableFilterStatus = document.getElementById('table-filter-status');
+    const loadingStatus = document.querySelector('.loading-status');
+
+    // --- LÓGICA DE DADOS ---
+    
+    // Converte o valor da célula em um status padronizado
+    function getStatusFromValue(value) {
+        const lowerCaseValue = (value || '').toLowerCase();
+        if (lowerCaseValue.includes('agendado')) return 'agendado';
+        if (lowerCaseValue === 'null' || lowerCaseValue === '') return 'nao_treinado';
+        return 'treinado';
+    }
+
+    async function loadDataFromSheet() {
+        try {
+            const response = await fetch(GOOGLE_SHEET_CSV_URL);
+            if (!response.ok) throw new Error('Erro ao carregar a planilha.');
+            
+            const csvText = await response.text();
+            const lines = csvText.trim().split('\n');
+            const headers = lines[0].split(',').map(h => h.trim());
+            
+            const nameIndex = headers.findIndex(h => h.toLowerCase().includes('name'));
+            const cargoIndex = headers.findIndex(h => h.toLowerCase().includes('cargo'));
+            const tarefasIndex = headers.findIndex(h => h.toLowerCase().includes('tarefas'));
+            const calendarioIndex = headers.findIndex(h => h.toLowerCase().includes('calend'));
+
+            colaboradores = lines.slice(1).map(line => {
+                const values = line.split(',').map(v => v.trim());
+                const cargo = values[cargoIndex] || 'Não definido';
+                let grupo = 'Outros';
+                if (cargo.toLowerCase().includes('diretor')) grupo = 'Diretor';
+                else if (cargo.toLowerCase().includes('gerente')) grupo = 'Gerente';
+                else if (cargo.toLowerCase().includes('gestor')) grupo = 'Gestor';
+                else if (cargo.toLowerCase().includes('coordenador')) grupo = 'Coordenador';
+                else if (cargo.toLowerCase().includes('analista')) grupo = 'Analista';
+
+                return {
+                    name: values[nameIndex] || '',
+                    cargo: cargo,
+                    tarefas: getStatusFromValue(values[tarefasIndex]),
+                    calendario: getStatusFromValue(values[calendarioIndex]),
+                    grupo: grupo
+                };
+            });
+
+            populateCargoFilter();
+            loadingStatus.textContent = '';
+            updateDashboard();
+
+        } catch (error) {
+            console.error('Erro:', error);
+            loadingStatus.textContent = 'Falha ao carregar. Verifique o link e as permissões.';
+        }
+    }
+    
+    function populateCargoFilter() {
+        const grupos = [...new Set(colaboradores.map(p => p.grupo))].sort();
+        cargoFilter.innerHTML = '<option value="Todos">Todos os Cargos</option>';
+        grupos.forEach(grupo => {
+            const option = document.createElement('option');
+            option.value = grupo;
+            
+            // Lógica para plural correto
+            if (grupo === 'Outros') {
+                option.textContent = 'Outros Cargos';
+            } else if (grupo.endsWith('r')) {
+                option.textContent = `${grupo}es`; // Diretor -> Diretores
+            } else {
+                option.textContent = `${grupo}s`; // Gerente -> Gerentes, Analista -> Analistas
+            }
+            
+            cargoFilter.appendChild(option);
+        });
+        cargoFilter.disabled = false;
+    }
+
+    // --- ATUALIZAÇÃO DO PAINEL ---
+
+    function updateDashboard() {
+        const cargoFiltro = cargoFilter.value;
+        const moduloFiltro = document.querySelector('input[name="modulo"]:checked').value;
+
+        const dataFilteredByCargo = (cargoFiltro === 'Todos')
+            ? colaboradores
+            : colaboradores.filter(p => p.grupo === cargoFiltro);
+
+        // Define o status geral de uma pessoa
+        const getOverallStatus = (p) => {
+            if (moduloFiltro === 'Tarefas') return p.tarefas;
+            if (moduloFiltro === 'Calendario') return p.calendario;
+            // Lógica para o status "Geral"
+            if (p.tarefas === 'treinado' || p.calendario === 'treinado') return 'treinado';
+            if (p.tarefas === 'agendado' || p.calendario === 'agendado') return 'agendado';
+            return 'nao_treinado';
+        };
+        
+        // Calcula totais para o gráfico
+        let treinados = 0, naoTreinados = 0, agendados = 0;
+        dataFilteredByCargo.forEach(p => {
+            const status = getOverallStatus(p);
+            if (status === 'treinado') treinados++;
+            else if (status === 'agendado') agendados++;
+            else naoTreinados++;
+        });
+
+        // Atualiza o gráfico
+        trainingChart.data.datasets[0].data = [treinados, naoTreinados, agendados];
+        trainingChart.options.plugins.title.text = `Distribuição (${dataFilteredByCargo.length} Pessoas)`;
+        trainingChart.update();
+
+        // Filtra dados para a tabela
+        let tableData = dataFilteredByCargo;
+        if (tableClickFilter) {
+            tableData = dataFilteredByCargo.filter(p => getOverallStatus(p) === tableClickFilter);
+            const statusText = {
+                'treinado': 'Treinados',
+                'nao_treinado': 'Não Treinados',
+                'agendado': 'Agendados'
+            };
+            tableFilterStatus.textContent = `Mostrando apenas: ${statusText[tableClickFilter]}`;
+        } else {
+            tableFilterStatus.textContent = '';
+        }
+        
+        // Atualiza a tabela
+        tableBody.innerHTML = '';
+        const statusToIcon = {
+            'treinado': '✅',
+            'nao_treinado': '❌',
+            'agendado': '⏰'
+        };
+
+        if (tableData.length > 0) {
+            tableData.forEach(p => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${p.name}</td>
+                    <td>${p.cargo}</td>
+                    <td>${statusToIcon[p.tarefas]}</td>
+                    <td>${statusToIcon[p.calendario]}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        } else {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="4" style="text-align:center; padding: 20px;">Nenhum colaborador encontrado.</td>`;
+            tableBody.appendChild(row);
+        }
+    }
+
+    // --- EVENTOS ---
+    cargoFilter.addEventListener('change', () => {
+        tableClickFilter = null;
+        updateDashboard();
+    });
+    moduloRadios.forEach(radio => radio.addEventListener('change', () => {
+        tableClickFilter = null;
+        updateDashboard();
+    }));
+
+    // Carga inicial
+    window.onload = () => {
+        loadDataFromSheet();
+    };
+
+</script>
+
+</body>
+</html>
