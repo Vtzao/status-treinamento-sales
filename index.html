@@ -31,7 +31,7 @@
         h1 {
             text-align: center;
             color: #2c3e50;
-            margin-bottom: 10px; /* Reduzido para aproximar o timestamp */
+            margin-bottom: 10px;
         }
         .timestamp {
             text-align: center;
@@ -41,12 +41,23 @@
             min-height: 1.2em;
         }
         .filters-container {
-            position: relative; /* Necessário para o posicionamento do pop-up */
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 25px;
             margin-bottom: 35px;
+        }
+        .filter-section {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px;
+        }
+        .filter-section h2 {
+            font-size: 1.2em;
+            color: #34495e;
+            margin: 0;
         }
         .filter-group {
             display: flex;
@@ -54,23 +65,6 @@
             gap: 15px;
             flex-wrap: wrap;
             justify-content: center;
-        }
-        .filter-group > label {
-            font-size: 1.1em;
-            font-weight: 500;
-            color: #34495e;
-        }
-        select {
-            padding: 12px 15px;
-            border-radius: 8px;
-            border: 1px solid #ccc;
-            font-size: 1em;
-            background-color: #fff;
-            cursor: pointer;
-            transition: border-color 0.3s;
-        }
-        select:hover {
-            border-color: #3498db;
         }
         .checkbox-group input { display: none; }
         .checkbox-group .checkbox-wrapper {
@@ -92,10 +86,9 @@
             color: #fff;
             border-color: #66798b;
         }
-        /* Estilo para checkboxes desativados */
         .checkbox-group input:disabled + label {
-            background-color: #f8f9fa;
-            border-color: #e9ecef;
+            background-color: #e9ecef;
+            border-color: #dee2e6;
             color: #adb5bd;
             cursor: not-allowed;
         }
@@ -114,49 +107,55 @@
             line-height: 1;
             z-index: 2;
         }
-        .tag-concluido {
-            color: #fff;
-            background-color: rgb(0, 110, 106);
+        .tag-concluido { color: #fff; background-color: rgb(0, 110, 106); }
+        .tag-andamento { color: #333; background-color: rgb(255, 192, 0); }
+        .tag-nao-iniciado { color: #495057; background-color: #f1f3f5; border: 1px solid #dee2e6; }
+        
+        /* Estilos para o Dropdown Múltiplo de Cargos */
+        .multi-select-container {
+            position: relative;
+            width: 300px;
         }
-        .tag-andamento {
-            color: #333;
-            background-color: rgb(255, 192, 0);
-        }
-        .tag-nao-iniciado {
-            color: #495057;
-            background-color: #f1f3f5;
-            border: 1px solid #dee2e6;
-        }
-        /* Estilos para o novo pop-up de instrução */
-        .tooltip {
-            position: absolute;
-            bottom: 100%; /* Posiciona acima do grupo de filtros */
-            left: 50%;
-            transform: translateX(-50%);
-            margin-bottom: 10px;
-            background-color: #333;
-            color: #fff;
-            padding: 10px 15px;
+        .select-box {
+            border: 1px solid #ccc;
             border-radius: 8px;
-            font-size: 0.9em;
-            white-space: nowrap;
-            z-index: 10;
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.3s, visibility 0.3s;
+            padding: 12px 15px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .tooltip.active {
-            opacity: 1;
-            visibility: visible;
+        .select-box::after {
+            content: '▼';
+            font-size: 0.8em;
         }
-        .tooltip-arrow {
+        .dropdown-options {
             position: absolute;
             top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            border-width: 6px;
-            border-style: solid;
-            border-color: #333 transparent transparent transparent;
+            left: 0;
+            right: 0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            background: #fff;
+            z-index: 10;
+            max-height: 250px;
+            overflow-y: auto;
+            display: none; /* Começa escondido */
+        }
+        .dropdown-options.active {
+            display: block;
+        }
+        .dropdown-options .option {
+            padding: 10px 15px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+        }
+        .dropdown-options .option:hover {
+            background-color: #f4f7fa;
+        }
+        .dropdown-options .option input {
+            margin-right: 10px;
         }
 
         .main-content {
@@ -246,6 +245,7 @@
             .filter-group { gap: 10px; }
             .checkbox-group label { padding: 6px 12px; font-size: 0.9em; }
             .chart-container { height: 350px; }
+            .multi-select-container { width: 100%; }
         }
     </style>
 </head>
@@ -256,19 +256,22 @@
     <p id="last-updated-timestamp" class="timestamp"></p>
 
     <div class="filters-container">
-        <div class="filter-group">
-            <label>Cargo:</label>
-            <select id="cargo-filter" disabled>
-                <option>Carregando...</option>
-            </select>
+        <div class="filter-section">
+            <h2>Selecione os Cargos:</h2>
+            <div class="multi-select-container" id="cargo-filter-container">
+                <div class="select-box" id="cargo-select-box">
+                    <span id="cargo-select-text">Todos os Cargos</span>
+                </div>
+                <div class="dropdown-options" id="cargo-options">
+                    <!-- Opções de cargo serão inseridas aqui -->
+                </div>
+            </div>
         </div>
-        <div class="filter-group checkbox-group" id="module-filter-group">
-            <!-- Checkboxes dos módulos serão inseridos aqui -->
-        </div>
-        <!-- Pop-up de instrução -->
-        <div id="tooltip" class="tooltip">
-            <div class="tooltip-text">Selecione um ou mais Módulos</div>
-            <div class="tooltip-arrow"></div>
+        <div class="filter-section">
+            <h2>Selecione os Módulos:</h2>
+            <div class="filter-group checkbox-group" id="module-filter-group">
+                <!-- Checkboxes dos módulos serão inseridos aqui -->
+            </div>
         </div>
     </div>
 
@@ -296,7 +299,7 @@
 
     // --- VARIÁVEIS GLOBAIS ---
     let colaboradores = [];
-    let chartStatusFilter = []; // <<-- MUDANÇA AQUI: de null para array
+    let chartStatusFilter = [];
     let moduleOverallStatus = {};
     const moduleMap = {
         acesso: 'Acesso',
@@ -343,7 +346,6 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            // <<-- LÓGICA DE CLIQUE ATUALIZADA -->>
             onClick: (event, elements) => {
                 if (elements.length > 0) {
                     const clickedIndex = elements[0].index;
@@ -355,10 +357,8 @@
                     if (status) {
                         const indexInFilter = chartStatusFilter.indexOf(status);
                         if (indexInFilter > -1) {
-                            // Se já está selecionado, remove
                             chartStatusFilter.splice(indexInFilter, 1);
                         } else {
-                            // Se não está, adiciona
                             chartStatusFilter.push(status);
                         }
                         updateDashboard();
@@ -377,14 +377,15 @@
         }
     });
 
-    const cargoFilter = document.getElementById('cargo-filter');
+    const cargoOptions = document.getElementById('cargo-options');
+    const cargoSelectBox = document.getElementById('cargo-select-box');
+    const cargoSelectText = document.getElementById('cargo-select-text');
     const moduleFilterGroup = document.getElementById('module-filter-group');
     const tableHeader = document.getElementById('table-header');
     const tableBody = document.getElementById('table-body');
     const tableFilterStatus = document.getElementById('table-filter-status');
     const loadingStatus = document.querySelector('.loading-status');
     const timestampEl = document.getElementById('last-updated-timestamp');
-    const tooltip = document.getElementById('tooltip');
 
     function getStatusFromValue(value) {
         const lowerCaseValue = (value || '').trim().toLowerCase();
@@ -443,8 +444,6 @@
             loadingStatus.textContent = '';
             updateDashboard();
 
-            tooltip.classList.add('active');
-
         } catch (error) {
             console.error('Erro:', error);
             loadingStatus.textContent = 'Falha ao carregar. Verifique o link e as permissões.';
@@ -470,17 +469,64 @@
     }
 
     function populateCargoFilter() {
+        cargoOptions.innerHTML = '';
+        
+        const selectAllOption = document.createElement('div');
+        selectAllOption.className = 'option';
+        selectAllOption.innerHTML = `<input type="checkbox" id="cargo-select-all" checked><label for="cargo-select-all">Todos os Cargos</label>`;
+        cargoOptions.appendChild(selectAllOption);
+
         const grupos = [...new Set(colaboradores.map(p => p.grupo))].sort();
-        cargoFilter.innerHTML = '<option value="Todos">Todos os Cargos</option>';
         grupos.forEach(grupo => {
-            const option = document.createElement('option');
-            option.value = grupo;
-            if (grupo === 'Outros') option.textContent = 'Outros Cargos';
-            else if (grupo.endsWith('r')) option.textContent = `${grupo}es`;
-            else option.textContent = `${grupo}s`;
-            cargoFilter.appendChild(option);
+            const optionId = `cargo-${grupo.replace(/\s+/g, '-')}`;
+            const option = document.createElement('div');
+            option.className = 'option';
+            option.innerHTML = `<input type="checkbox" id="${optionId}" value="${grupo}" class="cargo-checkbox" checked><label for="${optionId}">${grupo}</label>`;
+            cargoOptions.appendChild(option);
         });
-        cargoFilter.disabled = false;
+
+        const selectAllCargoCheckbox = document.getElementById('cargo-select-all');
+        const cargoCheckboxes = document.querySelectorAll('.cargo-checkbox');
+
+        const updateCargoSelectionText = () => {
+            const selectedCount = document.querySelectorAll('.cargo-checkbox:checked').length;
+            if (selectedCount === cargoCheckboxes.length) {
+                cargoSelectText.textContent = 'Todos os Cargos';
+            } else if (selectedCount === 0) {
+                cargoSelectText.textContent = 'Nenhum cargo selecionado';
+            } else if (selectedCount === 1) {
+                cargoSelectText.textContent = document.querySelector('.cargo-checkbox:checked').value;
+            } else {
+                cargoSelectText.textContent = `${selectedCount} cargos selecionados`;
+            }
+        };
+
+        selectAllCargoCheckbox.addEventListener('change', () => {
+            cargoCheckboxes.forEach(cb => { cb.checked = selectAllCargoCheckbox.checked; });
+            updateCargoSelectionText();
+            chartStatusFilter = [];
+            updateDashboard();
+        });
+
+        cargoCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                selectAllCargoCheckbox.checked = Array.from(cargoCheckboxes).every(c => c.checked);
+                updateCargoSelectionText();
+                chartStatusFilter = [];
+                updateDashboard();
+            });
+        });
+
+        cargoSelectBox.addEventListener('click', () => {
+            cargoOptions.classList.toggle('active');
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!cargoSelectBox.contains(e.target) && !cargoOptions.contains(e.target)) {
+                cargoOptions.classList.remove('active');
+            }
+        });
+        updateCargoSelectionText();
     }
 
     function populateModuleFilter() {
@@ -534,7 +580,6 @@
 
         moduleCheckboxes.forEach(cb => {
             cb.addEventListener('change', () => {
-                tooltip.classList.remove('active');
                 if(availableCheckboxes.length > 0) {
                     const allAvailableChecked = Array.from(availableCheckboxes).every(c => c.checked);
                     selectAllCheckbox.checked = allAvailableChecked;
@@ -548,17 +593,17 @@
     }
 
     function updateDashboard() {
-        const cargoFiltro = cargoFilter.value;
+        const activeCargos = Array.from(document.querySelectorAll('#cargo-options input.cargo-checkbox:checked')).map(cb => cb.value);
         const activeModules = Array.from(moduleFilterGroup.querySelectorAll('input.module-checkbox:checked')).map(cb => cb.value);
 
-        if (activeModules.length === 0) {
+        if (activeModules.length === 0 || activeCargos.length === 0) {
             trainingChart.data.datasets[0].data = [];
             trainingChart.options.plugins.title.display = false;
             trainingChart.options.plugins.legend.display = false;
             trainingChart.update();
             
             tableHeader.innerHTML = '<tr><th>Nome</th><th>Cargo</th></tr>';
-            tableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; padding: 20px;">Selecione os módulos que deseja visualizar na tabela.</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; padding: 20px;">Selecione cargos e módulos para visualizar.</td></tr>`;
             tableFilterStatus.textContent = '';
             return;
         }
@@ -566,9 +611,7 @@
         trainingChart.options.plugins.title.display = true;
         trainingChart.options.plugins.legend.display = true;
 
-        const dataFilteredByCargo = (cargoFiltro === 'Todos')
-            ? colaboradores
-            : colaboradores.filter(p => p.grupo === cargoFiltro);
+        const dataFilteredByCargo = colaboradores.filter(p => activeCargos.includes(p.grupo));
 
         const getOverallStatus = (p) => {
             const allStatuses = activeModules.map(mod => p[mod]);
@@ -585,14 +628,12 @@
             else naoTreinados++;
         });
 
-        // <<-- ATUALIZAÇÃO DO GRÁFICO PARA FEEDBACK VISUAL -->>
         const statusMap = ['treinado', 'nao_treinado', 'agendado'];
         trainingChart.data.datasets[0].offset = statusMap.map(status => chartStatusFilter.includes(status) ? 15 : 0);
         trainingChart.data.datasets[0].data = [treinados, naoTreinados, agendados];
         trainingChart.options.plugins.title.text = `Distribuição (${dataFilteredByCargo.length} Pessoas)`;
         trainingChart.update();
 
-        // <<-- ATUALIZAÇÃO DA LÓGICA DE FILTRO DA TABELA -->>
         let tableData = dataFilteredByCargo;
         if (chartStatusFilter.length > 0) {
             tableData = dataFilteredByCargo.filter(p => chartStatusFilter.includes(getOverallStatus(p)));
@@ -635,8 +676,6 @@
             tableBody.appendChild(row);
         }
     }
-
-    cargoFilter.addEventListener('change', () => { chartStatusFilter = []; updateDashboard(); });
     
     window.onload = () => { loadDataFromSheet(); };
 
