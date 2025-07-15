@@ -72,6 +72,9 @@
             border-color: #3498db;
         }
         .checkbox-group input { display: none; }
+        .checkbox-group .checkbox-wrapper {
+            position: relative;
+        }
         .checkbox-group label {
             padding: 8px 16px;
             border: 1px solid #ccc;
@@ -88,15 +91,40 @@
             color: #fff;
             border-color: #66798b;
         }
-        /* Estilo para a nova tag "Concluído" */
-        .completed-tag {
+        /* Estilo para checkboxes desativados */
+        .checkbox-group input:disabled + label {
+            background-color: #f8f9fa;
+            border-color: #e9ecef;
+            color: #adb5bd;
+            cursor: not-allowed;
+        }
+        .checkbox-group input:disabled + label .module-status-tag {
+            opacity: 0.6;
+        }
+        .module-status-tag {
+            position: absolute;
+            top: 0;
+            right: 0;
+            transform: translate(30%, -40%);
             font-size: 0.7em;
             font-weight: bold;
-            color: rgb(255, 255, 255);
-            background-color: rgb(0, 110, 106);
-            padding: 2px 8px;
+            padding: 3px 8px;
             border-radius: 10px;
-            margin-left: 8px;
+            line-height: 1;
+            z-index: 2;
+        }
+        .tag-concluido {
+            color: #fff;
+            background-color: rgb(0, 110, 106);
+        }
+        .tag-andamento {
+            color: #333;
+            background-color: rgb(255, 192, 0);
+        }
+        .tag-nao-iniciado {
+            color: #495057;
+            background-color: #f1f3f5;
+            border: 1px solid #dee2e6;
         }
         .main-content {
             display: flex;
@@ -163,6 +191,7 @@
         }
         #details-table td:nth-child(n+3) {
             font-size: 1.2em;
+            cursor: default;
         }
         #details-table tr:last-child td { border-bottom: none; }
         #details-table tr:nth-child(even) { background-color: #f8f9fa; }
@@ -230,7 +259,7 @@
     // --- VARIÁVEIS GLOBAIS ---
     let colaboradores = [];
     let tableClickFilter = null;
-    let moduleCompletionStatus = {};
+    let moduleOverallStatus = {};
     const moduleMap = {
         acesso: 'Acesso',
         tarefas: 'Tarefas',
@@ -307,21 +336,12 @@
     const loadingStatus = document.querySelector('.loading-status');
     const timestampEl = document.getElementById('last-updated-timestamp');
 
-    // <<-- LÓGICA ATUALIZADA AQUI -->>
     function getStatusFromValue(value) {
         const lowerCaseValue = (value || '').trim().toLowerCase();
-
-        // 1. Verifica se está vazio ou contém a palavra "null"
+        if (lowerCaseValue.includes('agendado')) return 'agendado';
         if (lowerCaseValue === '' || lowerCaseValue === 'null') {
             return 'nao_treinado';
         }
-
-        // 2. Verifica se contém a palavra "agendado"
-        if (lowerCaseValue.includes('agendado')) {
-            return 'agendado';
-        }
-
-        // 3. Se não for nenhum dos acima, é considerado "treinado"
         return 'treinado';
     }
 
@@ -363,12 +383,11 @@
                 });
                 return colaborador;
             });
-
-            // Define o timestamp após o carregamento bem-sucedido
+            
             const now = new Date();
             timestampEl.textContent = `Dados atualizados em: ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR')}`;
 
-            analyzeModuleCompletion();
+            analyzeModuleStatus();
             populateCargoFilter();
             populateModuleFilter();
             loadingStatus.textContent = '';
@@ -380,15 +399,21 @@
             timestampEl.textContent = 'Falha ao carregar dados.';
         }
     }
-
-    function analyzeModuleCompletion() {
+    
+    function analyzeModuleStatus() {
         modules.forEach(mod => {
             if (colaboradores.length === 0) {
-                moduleCompletionStatus[mod] = false;
+                moduleOverallStatus[mod] = 'nao_iniciado';
                 return;
             }
-            const isCompleted = colaboradores.every(p => p[mod] === 'treinado');
-            moduleCompletionStatus[mod] = isCompleted;
+            const allStatuses = colaboradores.map(p => p[mod]);
+            if (allStatuses.every(s => s === 'treinado')) {
+                moduleOverallStatus[mod] = 'concluido';
+            } else if (allStatuses.every(s => s === 'nao_treinado')) {
+                moduleOverallStatus[mod] = 'nao_iniciado';
+            } else {
+                moduleOverallStatus[mod] = 'em_andamento';
+            }
         });
     }
 
@@ -408,34 +433,78 @@
 
     function populateModuleFilter() {
         moduleFilterGroup.innerHTML = '';
+        
+        const selectAllWrapper = document.createElement('span');
+        selectAllWrapper.className = 'checkbox-wrapper';
+        selectAllWrapper.innerHTML = `
+            <input type="checkbox" id="mod-select-all">
+            <label for="mod-select-all" style="font-weight: bold;">Selecionar Todos</label>
+        `;
+        moduleFilterGroup.appendChild(selectAllWrapper);
+
         modules.forEach(mod => {
             const checkboxId = `mod-${mod}`;
             const checkboxWrapper = document.createElement('span');
-            const isCompleted = moduleCompletionStatus[mod];
-            const completedTag = isCompleted ? '<span class="completed-tag">Concluído</span>' : '';
+            checkboxWrapper.className = 'checkbox-wrapper';
+            const status = moduleOverallStatus[mod];
+            let statusTag = '';
+            
+            // <<-- LÓGICA DE DESABILITAR O CHECKBOX -->>
+            const isDisabled = (status === 'nao_iniciado');
+            const disabledAttribute = isDisabled ? 'disabled' : '';
+
+            if (status === 'concluido') {
+                statusTag = '<span class="module-status-tag tag-concluido">Concluído</span>';
+            } else if (status === 'em_andamento') {
+                statusTag = '<span class="module-status-tag tag-andamento">Andamento</span>';
+            } else if (status === 'nao_iniciado') {
+                statusTag = '<span class="module-status-tag tag-nao-iniciado">Em Breve</span>';
+            }
 
             checkboxWrapper.innerHTML = `
-                <input type="checkbox" id="${checkboxId}" value="${mod}">
-                <label for="${checkboxId}">${moduleMap[mod]}${completedTag}</label>
+                <input type="checkbox" id="${checkboxId}" value="${mod}" class="module-checkbox" ${disabledAttribute}>
+                <label for="${checkboxId}">${moduleMap[mod]}</label>
+                ${statusTag}
             `;
-            checkboxWrapper.querySelector('input').addEventListener('change', () => {
+            moduleFilterGroup.appendChild(checkboxWrapper);
+        });
+
+        const selectAllCheckbox = document.getElementById('mod-select-all');
+        const moduleCheckboxes = document.querySelectorAll('.module-checkbox');
+        const availableCheckboxes = document.querySelectorAll('.module-checkbox:not(:disabled)');
+
+        selectAllCheckbox.addEventListener('change', () => {
+            availableCheckboxes.forEach(cb => {
+                cb.checked = selectAllCheckbox.checked;
+            });
+            tableClickFilter = null;
+            updateDashboard();
+        });
+
+        moduleCheckboxes.forEach(cb => {
+            cb.addEventListener('change', () => {
+                if(availableCheckboxes.length > 0) {
+                    const allAvailableChecked = Array.from(availableCheckboxes).every(c => c.checked);
+                    selectAllCheckbox.checked = allAvailableChecked;
+                } else {
+                    selectAllCheckbox.checked = false;
+                }
                 tableClickFilter = null;
                 updateDashboard();
             });
-            moduleFilterGroup.appendChild(checkboxWrapper);
         });
     }
 
     function updateDashboard() {
         const cargoFiltro = cargoFilter.value;
-        const activeModules = Array.from(moduleFilterGroup.querySelectorAll('input:checked')).map(cb => cb.value);
+        const activeModules = Array.from(moduleFilterGroup.querySelectorAll('input.module-checkbox:checked')).map(cb => cb.value);
 
         if (activeModules.length === 0) {
             trainingChart.data.datasets[0].data = [];
             trainingChart.options.plugins.title.display = false;
             trainingChart.options.plugins.legend.display = false;
             trainingChart.update();
-
+            
             tableHeader.innerHTML = '<tr><th>Nome</th><th>Cargo</th></tr>';
             tableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; padding: 20px;">Selecione os módulos que deseja visualizar na tabela.</td></tr>`;
             tableFilterStatus.textContent = '';
@@ -455,7 +524,7 @@
             if (allStatuses.includes('agendado')) return 'agendado';
             return 'treinado';
         };
-
+        
         let treinados = 0, naoTreinados = 0, agendados = 0;
         dataFilteredByCargo.forEach(p => {
             const status = getOverallStatus(p);
@@ -479,7 +548,7 @@
 
         tableHeader.innerHTML = '';
         tableBody.innerHTML = '';
-
+        
         let headerRow = '<tr>';
         headerRow += `<th>Nome</th>`;
         headerRow += `<th>Cargo</th>`;
@@ -490,13 +559,15 @@
         tableHeader.innerHTML = headerRow;
 
         const statusToIcon = { 'treinado': '✅', 'nao_treinado': '❌', 'agendado': '⏰' };
+        const statusToText = { 'treinado': 'Treinado', 'nao_treinado': 'Não Treinado', 'agendado': 'Agendado' };
 
         if (tableData.length > 0) {
             tableData.forEach(p => {
                 const row = document.createElement('tr');
                 let cells = `<td>${p.name}</td><td>${p.cargo}</td>`;
                 activeModules.forEach(mod => {
-                    cells += `<td>${statusToIcon[p[mod]]}</td>`;
+                    const status = p[mod];
+                    cells += `<td title="${statusToText[status]}">${statusToIcon[status]}</td>`;
                 });
                 row.innerHTML = cells;
                 tableBody.appendChild(row);
@@ -509,7 +580,7 @@
     }
 
     cargoFilter.addEventListener('change', () => { tableClickFilter = null; updateDashboard(); });
-
+    
     window.onload = () => { loadDataFromSheet(); };
 
 </script>
