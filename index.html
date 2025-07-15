@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel de Treinamentos v6 (Status Agendado)</title>
+    <title>Painel de Treinamentos Responsivo</title>
     <!-- Importa a biblioteca para criar os gráficos -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <!-- PLUGIN ADICIONAL para mostrar os números dentro do gráfico -->
@@ -15,14 +15,14 @@
             background-color: #f4f7fa;
             color: #333;
             margin: 0;
-            padding: 20px;
+            padding: 16px;
         }
         .container {
             width: 100%;
-            max-width: 1300px;
+            max-width: 1400px;
             margin: auto;
             background: #ffffff;
-            padding: 30px;
+            padding: 24px;
             border-radius: 12px;
             box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
             display: flex;
@@ -31,19 +31,28 @@
         h1 {
             text-align: center;
             color: #2c3e50;
+            margin-bottom: 10px; /* Reduzido para aproximar o timestamp */
+        }
+        .timestamp {
+            text-align: center;
+            color: #777;
+            font-size: 0.9em;
             margin-bottom: 25px;
+            min-height: 1.2em;
         }
         .filters-container {
             display: flex;
-            justify-content: center;
-            gap: 40px;
+            flex-direction: column;
+            align-items: center;
+            gap: 25px;
             margin-bottom: 35px;
-            flex-wrap: wrap;
         }
         .filter-group {
             display: flex;
             align-items: center;
             gap: 15px;
+            flex-wrap: wrap;
+            justify-content: center;
         }
         .filter-group > label {
             font-size: 1.1em;
@@ -62,19 +71,32 @@
         select:hover {
             border-color: #3498db;
         }
-        .radio-group input { display: none; }
-        .radio-group label {
+        .checkbox-group input { display: none; }
+        .checkbox-group label {
             padding: 8px 16px;
             border: 1px solid #ccc;
             border-radius: 20px;
             cursor: pointer;
             font-weight: normal;
             transition: all 0.3s;
+            user-select: none;
+            display: inline-flex;
+            align-items: center;
         }
-        .radio-group input:checked + label {
-            background-color: #2c3e50;
+        .checkbox-group input:checked + label {
+            background-color: #74828f;
             color: #fff;
-            border-color: #2c3e50;
+            border-color: #66798b;
+        }
+        /* Estilo para a nova tag "Concluído" */
+        .completed-tag {
+            font-size: 0.7em;
+            font-weight: bold;
+            color: rgb(255, 255, 255);
+            background-color: rgb(0, 110, 106);
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 8px;
         }
         .main-content {
             display: flex;
@@ -82,25 +104,28 @@
             align-items: flex-start;
         }
         .chart-section {
-            flex: 1.3;
-            min-width: 450px;
+            flex: 1;
+            min-width: 350px;
         }
         .table-section {
-            flex: 1.2;
+            flex: 1.8;
             display: flex;
             flex-direction: column;
+            min-width: 0;
+            align-items: flex-start;
         }
         .chart-container {
             position: relative;
             width: 100%;
-            max-width: 550px;
+            max-width: 500px;
             height: 440px;
             margin: 0 auto;
             cursor: pointer;
         }
         .table-wrapper {
+            max-width: 100%;
             max-height: 65vh;
-            overflow-y: auto;
+            overflow: auto;
             border: 1px solid #dfe6e9;
             border-radius: 8px;
         }
@@ -112,27 +137,53 @@
             margin-top: 0;
         }
         #details-table {
-            width: 100%;
             border-collapse: collapse;
+            border-spacing: 0;
+        }
+        #details-table thead {
+            position: -webkit-sticky;
+            position: sticky;
+            top: 0;
+            z-index: 1;
         }
         #details-table th, #details-table td {
             border: none;
             border-bottom: 1px solid #dfe6e9;
-            padding: 14px;
+            padding: 12px;
             text-align: left;
+            white-space: nowrap;
         }
         #details-table th {
             background-color: #f1f5f8;
             font-weight: 600;
             color: #34495e;
-            position: sticky;
-            top: 0;
+        }
+        #details-table th:nth-child(n+3), #details-table td:nth-child(n+3) {
+             text-align: center;
+        }
+        #details-table td:nth-child(n+3) {
+            font-size: 1.2em;
         }
         #details-table tr:last-child td { border-bottom: none; }
         #details-table tr:nth-child(even) { background-color: #f8f9fa; }
-        #details-table td:nth-child(3), #details-table td:nth-child(4) {
-            text-align: center;
-            font-size: 1.2em;
+
+        @media (max-width: 1024px) {
+            .main-content {
+                flex-direction: column;
+                align-items: center;
+            }
+            .chart-section, .table-section {
+                width: 100%;
+            }
+            .chart-section { max-width: 500px; }
+            .table-section { align-items: stretch; }
+        }
+        @media (max-width: 600px) {
+            .container { padding: 16px; }
+            h1 { font-size: 1.5em; }
+            .filter-group { gap: 10px; }
+            .checkbox-group label { padding: 6px 12px; font-size: 0.9em; }
+            .chart-container { height: 350px; }
         }
     </style>
 </head>
@@ -140,7 +191,8 @@
 
 <div class="container">
     <h1>📊 Painel Interativo de Treinamentos</h1>
-    
+    <p id="last-updated-timestamp" class="timestamp"></p>
+
     <div class="filters-container">
         <div class="filter-group">
             <label>Cargo:</label>
@@ -148,14 +200,8 @@
                 <option>Carregando...</option>
             </select>
         </div>
-        <div class="filter-group radio-group">
-            <label>Módulo:</label>
-            <input type="radio" id="mod-geral" name="modulo" value="Geral" checked>
-            <label for="mod-geral">Geral</label>
-            <input type="radio" id="mod-tarefas" name="modulo" value="Tarefas">
-            <label for="mod-tarefas">Tarefas</label>
-            <input type="radio" id="mod-calendario" name="modulo" value="Calendario">
-            <label for="mod-calendario">Calendário</label>
+        <div class="filter-group checkbox-group" id="module-filter-group">
+            <!-- Checkboxes dos módulos serão inseridos aqui -->
         </div>
     </div>
 
@@ -169,17 +215,8 @@
             <h2 id="table-filter-status" class="loading-status">Carregando dados da planilha...</h2>
             <div class="table-wrapper">
                 <table id="details-table">
-                    <thead>
-                        <tr>
-                            <th>Nome</th>
-                            <th>Cargo</th>
-                            <th>Tarefas</th>
-                            <th>Calendário</th>
-                        </tr>
-                    </thead>
-                    <tbody id="table-body">
-                        <!-- As linhas da tabela serão inseridas aqui via JavaScript -->
-                    </tbody>
+                    <thead id="table-header"></thead>
+                    <tbody id="table-body"></tbody>
                 </table>
             </div>
         </div>
@@ -188,14 +225,40 @@
 
 <script>
     // --- LINK DA SUA PLANILHA ---
-    const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/1w6hqW8Vgpake8BX5b7ryI8QbMCBgao-BJcMEU4mfUNs/export?format=csv';
+    const GOOGLE_SHEET_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vShdWRngNunn5QJT8L7o5_DtMzZSpXKgqpiv6X0xIT7O_LZbymmwqS-YhFR5rn1KLhnZ9wLp8RNvc_S/pub?output=csv';
 
     // --- VARIÁVEIS GLOBAIS ---
     let colaboradores = [];
-    let tableClickFilter = null; // Pode ser 'treinado', 'nao_treinado', 'agendado'
+    let tableClickFilter = null;
+    let moduleCompletionStatus = {};
+    const moduleMap = {
+        acesso: 'Acesso',
+        tarefas: 'Tarefas',
+        relatorios: 'Relatórios',
+        calendario: 'Calendário',
+        leads: 'Leads',
+        contas: 'Contas',
+        contatos: 'Contatos'
+    };
+    const modules = Object.keys(moduleMap);
 
-    // Registra o plugin de datalabels
-    Chart.register(ChartDataLabels);
+    const noDataPlugin = {
+        id: 'noData',
+        afterDraw: (chart) => {
+            if (chart.data.datasets[0].data.length === 0) {
+                const { ctx, width, height } = chart;
+                ctx.save();
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.font = 'bold 16px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+                ctx.fillStyle = '#666';
+                ctx.fillText('Selecione um módulo para consulta', width / 2, height / 2);
+                ctx.restore();
+            }
+        }
+    };
+
+    Chart.register(ChartDataLabels, noDataPlugin);
 
     const ctx = document.getElementById('trainingChart').getContext('2d');
     const trainingChart = new Chart(ctx, {
@@ -205,7 +268,7 @@
             datasets: [{
                 label: 'Status de Treinamento',
                 data: [0, 0, 0],
-                backgroundColor: ['rgb(0, 110, 106)', 'rgb(192, 0, 0)', 'rgb(255, 192, 0)'], // Verde, Vermelho, Amarelo (da imagem)
+                backgroundColor: ['rgb(0, 110, 106)', 'rgb(192, 0, 0)', 'rgb(255, 192, 0)'],
                 borderColor: '#ffffff',
                 borderWidth: 4
             }]
@@ -220,7 +283,6 @@
                     if (clickedIndex === 0) newFilter = 'treinado';
                     if (clickedIndex === 1) newFilter = 'nao_treinado';
                     if (clickedIndex === 2) newFilter = 'agendado';
-                    
                     tableClickFilter = (tableClickFilter === newFilter) ? null : newFilter;
                     updateDashboard();
                 }
@@ -231,50 +293,63 @@
                 datalabels: {
                     formatter: (value) => (value > 0 ? value : ''),
                     font: { weight: 'bold', size: 16 },
-                    color: (context) => {
-                        // Para Amarelo (Agendados), usa texto preto
-                        if (context.dataIndex === 2) return '#333';
-                        // Para Verde (Treinados) e Vermelho (Não Treinados), usa texto branco
-                        return '#fff';
-                    },
+                    color: (context) => (context.dataIndex === 2 ? '#333' : '#fff'),
                 }
             }
         }
     });
 
     const cargoFilter = document.getElementById('cargo-filter');
-    const moduloRadios = document.querySelectorAll('input[name="modulo"]');
+    const moduleFilterGroup = document.getElementById('module-filter-group');
+    const tableHeader = document.getElementById('table-header');
     const tableBody = document.getElementById('table-body');
     const tableFilterStatus = document.getElementById('table-filter-status');
     const loadingStatus = document.querySelector('.loading-status');
+    const timestampEl = document.getElementById('last-updated-timestamp');
 
-    // --- LÓGICA DE DADOS ---
-    
-    // Converte o valor da célula em um status padronizado
+    // <<-- LÓGICA ATUALIZADA AQUI -->>
     function getStatusFromValue(value) {
-        const lowerCaseValue = (value || '').toLowerCase();
-        if (lowerCaseValue.includes('agendado')) return 'agendado';
-        if (lowerCaseValue === 'null' || lowerCaseValue === '') return 'nao_treinado';
+        const lowerCaseValue = (value || '').trim().toLowerCase();
+
+        // 1. Verifica se está vazio ou contém a palavra "null"
+        if (lowerCaseValue === '' || lowerCaseValue === 'null') {
+            return 'nao_treinado';
+        }
+
+        // 2. Verifica se contém a palavra "agendado"
+        if (lowerCaseValue.includes('agendado')) {
+            return 'agendado';
+        }
+
+        // 3. Se não for nenhum dos acima, é considerado "treinado"
         return 'treinado';
     }
 
     async function loadDataFromSheet() {
+        timestampEl.textContent = 'A carregar dados...';
         try {
             const response = await fetch(GOOGLE_SHEET_CSV_URL);
             if (!response.ok) throw new Error('Erro ao carregar a planilha.');
-            
+
             const csvText = await response.text();
             const lines = csvText.trim().split('\n');
-            const headers = lines[0].split(',').map(h => h.trim());
-            
-            const nameIndex = headers.findIndex(h => h.toLowerCase().includes('name'));
-            const cargoIndex = headers.findIndex(h => h.toLowerCase().includes('cargo'));
-            const tarefasIndex = headers.findIndex(h => h.toLowerCase().includes('tarefas'));
-            const calendarioIndex = headers.findIndex(h => h.toLowerCase().includes('calend'));
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+            const columnIndexes = {
+                name: headers.indexOf('name'),
+                cargo: headers.indexOf('cargo'),
+                acesso: headers.indexOf('acesso ao user'),
+                tarefas: headers.indexOf('tarefas'),
+                relatorios: headers.indexOf('relatórios'),
+                calendario: headers.indexOf('calendário c/ sinc outlook'),
+                leads: headers.indexOf('leads'),
+                contas: headers.indexOf('contas'),
+                contatos: headers.indexOf('contatos')
+            };
 
             colaboradores = lines.slice(1).map(line => {
                 const values = line.split(',').map(v => v.trim());
-                const cargo = values[cargoIndex] || 'Não definido';
+                const cargo = values[columnIndexes.cargo] || 'Não definido';
                 let grupo = 'Outros';
                 if (cargo.toLowerCase().includes('diretor')) grupo = 'Diretor';
                 else if (cargo.toLowerCase().includes('gerente')) grupo = 'Gerente';
@@ -282,67 +357,105 @@
                 else if (cargo.toLowerCase().includes('coordenador')) grupo = 'Coordenador';
                 else if (cargo.toLowerCase().includes('analista')) grupo = 'Analista';
 
-                return {
-                    name: values[nameIndex] || '',
-                    cargo: cargo,
-                    tarefas: getStatusFromValue(values[tarefasIndex]),
-                    calendario: getStatusFromValue(values[calendarioIndex]),
-                    grupo: grupo
-                };
+                const colaborador = { name: values[columnIndexes.name] || '', cargo: cargo, grupo: grupo };
+                modules.forEach(mod => {
+                    colaborador[mod] = getStatusFromValue(values[columnIndexes[mod]]);
+                });
+                return colaborador;
             });
 
+            // Define o timestamp após o carregamento bem-sucedido
+            const now = new Date();
+            timestampEl.textContent = `Dados atualizados em: ${now.toLocaleDateString('pt-BR')} ${now.toLocaleTimeString('pt-BR')}`;
+
+            analyzeModuleCompletion();
             populateCargoFilter();
+            populateModuleFilter();
             loadingStatus.textContent = '';
             updateDashboard();
 
         } catch (error) {
             console.error('Erro:', error);
             loadingStatus.textContent = 'Falha ao carregar. Verifique o link e as permissões.';
+            timestampEl.textContent = 'Falha ao carregar dados.';
         }
     }
-    
+
+    function analyzeModuleCompletion() {
+        modules.forEach(mod => {
+            if (colaboradores.length === 0) {
+                moduleCompletionStatus[mod] = false;
+                return;
+            }
+            const isCompleted = colaboradores.every(p => p[mod] === 'treinado');
+            moduleCompletionStatus[mod] = isCompleted;
+        });
+    }
+
     function populateCargoFilter() {
         const grupos = [...new Set(colaboradores.map(p => p.grupo))].sort();
         cargoFilter.innerHTML = '<option value="Todos">Todos os Cargos</option>';
         grupos.forEach(grupo => {
             const option = document.createElement('option');
             option.value = grupo;
-            
-            // Lógica para plural correto
-            if (grupo === 'Outros') {
-                option.textContent = 'Outros Cargos';
-            } else if (grupo.endsWith('r')) {
-                option.textContent = `${grupo}es`; // Diretor -> Diretores
-            } else {
-                option.textContent = `${grupo}s`; // Gerente -> Gerentes, Analista -> Analistas
-            }
-            
+            if (grupo === 'Outros') option.textContent = 'Outros Cargos';
+            else if (grupo.endsWith('r')) option.textContent = `${grupo}es`;
+            else option.textContent = `${grupo}s`;
             cargoFilter.appendChild(option);
         });
         cargoFilter.disabled = false;
     }
 
-    // --- ATUALIZAÇÃO DO PAINEL ---
+    function populateModuleFilter() {
+        moduleFilterGroup.innerHTML = '';
+        modules.forEach(mod => {
+            const checkboxId = `mod-${mod}`;
+            const checkboxWrapper = document.createElement('span');
+            const isCompleted = moduleCompletionStatus[mod];
+            const completedTag = isCompleted ? '<span class="completed-tag">Concluído</span>' : '';
+
+            checkboxWrapper.innerHTML = `
+                <input type="checkbox" id="${checkboxId}" value="${mod}">
+                <label for="${checkboxId}">${moduleMap[mod]}${completedTag}</label>
+            `;
+            checkboxWrapper.querySelector('input').addEventListener('change', () => {
+                tableClickFilter = null;
+                updateDashboard();
+            });
+            moduleFilterGroup.appendChild(checkboxWrapper);
+        });
+    }
 
     function updateDashboard() {
         const cargoFiltro = cargoFilter.value;
-        const moduloFiltro = document.querySelector('input[name="modulo"]:checked').value;
+        const activeModules = Array.from(moduleFilterGroup.querySelectorAll('input:checked')).map(cb => cb.value);
+
+        if (activeModules.length === 0) {
+            trainingChart.data.datasets[0].data = [];
+            trainingChart.options.plugins.title.display = false;
+            trainingChart.options.plugins.legend.display = false;
+            trainingChart.update();
+
+            tableHeader.innerHTML = '<tr><th>Nome</th><th>Cargo</th></tr>';
+            tableBody.innerHTML = `<tr><td colspan="2" style="text-align:center; padding: 20px;">Selecione os módulos que deseja visualizar na tabela.</td></tr>`;
+            tableFilterStatus.textContent = '';
+            return;
+        }
+
+        trainingChart.options.plugins.title.display = true;
+        trainingChart.options.plugins.legend.display = true;
 
         const dataFilteredByCargo = (cargoFiltro === 'Todos')
             ? colaboradores
             : colaboradores.filter(p => p.grupo === cargoFiltro);
 
-        // Define o status geral de uma pessoa
         const getOverallStatus = (p) => {
-            if (moduloFiltro === 'Tarefas') return p.tarefas;
-            if (moduloFiltro === 'Calendario') return p.calendario;
-            // Lógica para o status "Geral"
-            if (p.tarefas === 'treinado' || p.calendario === 'treinado') return 'treinado';
-            if (p.tarefas === 'agendado' || p.calendario === 'agendado') return 'agendado';
-            return 'nao_treinado';
+            const allStatuses = activeModules.map(mod => p[mod]);
+            if (allStatuses.includes('nao_treinado')) return 'nao_treinado';
+            if (allStatuses.includes('agendado')) return 'agendado';
+            return 'treinado';
         };
-        
-        // Calcula totais para o gráfico
+
         let treinados = 0, naoTreinados = 0, agendados = 0;
         dataFilteredByCargo.forEach(p => {
             const status = getOverallStatus(p);
@@ -351,65 +464,53 @@
             else naoTreinados++;
         });
 
-        // Atualiza o gráfico
         trainingChart.data.datasets[0].data = [treinados, naoTreinados, agendados];
         trainingChart.options.plugins.title.text = `Distribuição (${dataFilteredByCargo.length} Pessoas)`;
         trainingChart.update();
 
-        // Filtra dados para a tabela
         let tableData = dataFilteredByCargo;
         if (tableClickFilter) {
             tableData = dataFilteredByCargo.filter(p => getOverallStatus(p) === tableClickFilter);
-            const statusText = {
-                'treinado': 'Treinados',
-                'nao_treinado': 'Não Treinados',
-                'agendado': 'Agendados'
-            };
+            const statusText = { 'treinado': 'Treinados', 'nao_treinado': 'Não Treinados', 'agendado': 'Agendados' };
             tableFilterStatus.textContent = `Mostrando apenas: ${statusText[tableClickFilter]}`;
         } else {
             tableFilterStatus.textContent = '';
         }
-        
-        // Atualiza a tabela
+
+        tableHeader.innerHTML = '';
         tableBody.innerHTML = '';
-        const statusToIcon = {
-            'treinado': '✅',
-            'nao_treinado': '❌',
-            'agendado': '⏰'
-        };
+
+        let headerRow = '<tr>';
+        headerRow += `<th>Nome</th>`;
+        headerRow += `<th>Cargo</th>`;
+        activeModules.forEach(mod => {
+            headerRow += `<th>${moduleMap[mod]}</th>`;
+        });
+        headerRow += '</tr>';
+        tableHeader.innerHTML = headerRow;
+
+        const statusToIcon = { 'treinado': '✅', 'nao_treinado': '❌', 'agendado': '⏰' };
 
         if (tableData.length > 0) {
             tableData.forEach(p => {
                 const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${p.name}</td>
-                    <td>${p.cargo}</td>
-                    <td>${statusToIcon[p.tarefas]}</td>
-                    <td>${statusToIcon[p.calendario]}</td>
-                `;
+                let cells = `<td>${p.name}</td><td>${p.cargo}</td>`;
+                activeModules.forEach(mod => {
+                    cells += `<td>${statusToIcon[p[mod]]}</td>`;
+                });
+                row.innerHTML = cells;
                 tableBody.appendChild(row);
             });
         } else {
             const row = document.createElement('tr');
-            row.innerHTML = `<td colspan="4" style="text-align:center; padding: 20px;">Nenhum colaborador encontrado.</td>`;
+            row.innerHTML = `<td colspan="${activeModules.length + 2}" style="text-align:center; padding: 20px;">Nenhum colaborador encontrado.</td>`;
             tableBody.appendChild(row);
         }
     }
 
-    // --- EVENTOS ---
-    cargoFilter.addEventListener('change', () => {
-        tableClickFilter = null;
-        updateDashboard();
-    });
-    moduloRadios.forEach(radio => radio.addEventListener('change', () => {
-        tableClickFilter = null;
-        updateDashboard();
-    }));
+    cargoFilter.addEventListener('change', () => { tableClickFilter = null; updateDashboard(); });
 
-    // Carga inicial
-    window.onload = () => {
-        loadDataFromSheet();
-    };
+    window.onload = () => { loadDataFromSheet(); };
 
 </script>
 
