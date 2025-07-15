@@ -41,6 +41,7 @@
             min-height: 1.2em;
         }
         .filters-container {
+            position: relative; /* Necessário para o posicionamento do pop-up */
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -126,6 +127,38 @@
             background-color: #f1f3f5;
             border: 1px solid #dee2e6;
         }
+        /* Estilos para o novo pop-up de instrução */
+        .tooltip {
+            position: absolute;
+            bottom: 100%; /* Posiciona acima do grupo de filtros */
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 10px;
+            background-color: #333;
+            color: #fff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            font-size: 0.9em;
+            white-space: nowrap;
+            z-index: 10;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+        .tooltip.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .tooltip-arrow {
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+
         .main-content {
             display: flex;
             gap: 40px;
@@ -232,6 +265,11 @@
         <div class="filter-group checkbox-group" id="module-filter-group">
             <!-- Checkboxes dos módulos serão inseridos aqui -->
         </div>
+        <!-- Pop-up de instrução -->
+        <div id="tooltip" class="tooltip">
+            <div class="tooltip-text">Selecione um ou mais Módulos</div>
+            <div class="tooltip-arrow"></div>
+        </div>
     </div>
 
     <div class="main-content">
@@ -258,7 +296,7 @@
 
     // --- VARIÁVEIS GLOBAIS ---
     let colaboradores = [];
-    let tableClickFilter = null;
+    let chartStatusFilter = []; // <<-- MUDANÇA AQUI: de null para array
     let moduleOverallStatus = {};
     const moduleMap = {
         acesso: 'Acesso',
@@ -305,15 +343,26 @@
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            // <<-- LÓGICA DE CLIQUE ATUALIZADA -->>
             onClick: (event, elements) => {
                 if (elements.length > 0) {
                     const clickedIndex = elements[0].index;
-                    let newFilter = null;
-                    if (clickedIndex === 0) newFilter = 'treinado';
-                    if (clickedIndex === 1) newFilter = 'nao_treinado';
-                    if (clickedIndex === 2) newFilter = 'agendado';
-                    tableClickFilter = (tableClickFilter === newFilter) ? null : newFilter;
-                    updateDashboard();
+                    let status = null;
+                    if (clickedIndex === 0) status = 'treinado';
+                    if (clickedIndex === 1) status = 'nao_treinado';
+                    if (clickedIndex === 2) status = 'agendado';
+                    
+                    if (status) {
+                        const indexInFilter = chartStatusFilter.indexOf(status);
+                        if (indexInFilter > -1) {
+                            // Se já está selecionado, remove
+                            chartStatusFilter.splice(indexInFilter, 1);
+                        } else {
+                            // Se não está, adiciona
+                            chartStatusFilter.push(status);
+                        }
+                        updateDashboard();
+                    }
                 }
             },
             plugins: {
@@ -335,6 +384,7 @@
     const tableFilterStatus = document.getElementById('table-filter-status');
     const loadingStatus = document.querySelector('.loading-status');
     const timestampEl = document.getElementById('last-updated-timestamp');
+    const tooltip = document.getElementById('tooltip');
 
     function getStatusFromValue(value) {
         const lowerCaseValue = (value || '').trim().toLowerCase();
@@ -393,6 +443,8 @@
             loadingStatus.textContent = '';
             updateDashboard();
 
+            tooltip.classList.add('active');
+
         } catch (error) {
             console.error('Erro:', error);
             loadingStatus.textContent = 'Falha ao carregar. Verifique o link e as permissões.';
@@ -449,7 +501,6 @@
             const status = moduleOverallStatus[mod];
             let statusTag = '';
             
-            // <<-- LÓGICA DE DESABILITAR O CHECKBOX -->>
             const isDisabled = (status === 'nao_iniciado');
             const disabledAttribute = isDisabled ? 'disabled' : '';
 
@@ -477,19 +528,20 @@
             availableCheckboxes.forEach(cb => {
                 cb.checked = selectAllCheckbox.checked;
             });
-            tableClickFilter = null;
+            chartStatusFilter = [];
             updateDashboard();
         });
 
         moduleCheckboxes.forEach(cb => {
             cb.addEventListener('change', () => {
+                tooltip.classList.remove('active');
                 if(availableCheckboxes.length > 0) {
                     const allAvailableChecked = Array.from(availableCheckboxes).every(c => c.checked);
                     selectAllCheckbox.checked = allAvailableChecked;
                 } else {
                     selectAllCheckbox.checked = false;
                 }
-                tableClickFilter = null;
+                chartStatusFilter = [];
                 updateDashboard();
             });
         });
@@ -533,15 +585,20 @@
             else naoTreinados++;
         });
 
+        // <<-- ATUALIZAÇÃO DO GRÁFICO PARA FEEDBACK VISUAL -->>
+        const statusMap = ['treinado', 'nao_treinado', 'agendado'];
+        trainingChart.data.datasets[0].offset = statusMap.map(status => chartStatusFilter.includes(status) ? 15 : 0);
         trainingChart.data.datasets[0].data = [treinados, naoTreinados, agendados];
         trainingChart.options.plugins.title.text = `Distribuição (${dataFilteredByCargo.length} Pessoas)`;
         trainingChart.update();
 
+        // <<-- ATUALIZAÇÃO DA LÓGICA DE FILTRO DA TABELA -->>
         let tableData = dataFilteredByCargo;
-        if (tableClickFilter) {
-            tableData = dataFilteredByCargo.filter(p => getOverallStatus(p) === tableClickFilter);
-            const statusText = { 'treinado': 'Treinados', 'nao_treinado': 'Não Treinados', 'agendado': 'Agendados' };
-            tableFilterStatus.textContent = `Mostrando apenas: ${statusText[tableClickFilter]}`;
+        if (chartStatusFilter.length > 0) {
+            tableData = dataFilteredByCargo.filter(p => chartStatusFilter.includes(getOverallStatus(p)));
+            const statusTextMap = { 'treinado': 'Treinados', 'nao_treinado': 'Não Treinados', 'agendado': 'Agendados' };
+            const selectedStatusTexts = chartStatusFilter.map(s => statusTextMap[s]).join(', ');
+            tableFilterStatus.textContent = `Mostrando apenas: ${selectedStatusTexts}`;
         } else {
             tableFilterStatus.textContent = '';
         }
@@ -579,7 +636,7 @@
         }
     }
 
-    cargoFilter.addEventListener('change', () => { tableClickFilter = null; updateDashboard(); });
+    cargoFilter.addEventListener('change', () => { chartStatusFilter = []; updateDashboard(); });
     
     window.onload = () => { loadDataFromSheet(); };
 
